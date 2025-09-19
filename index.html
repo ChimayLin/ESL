@@ -125,9 +125,9 @@
         const buttonText = document.getElementById('button-text');
         const buttonSpinner = document.getElementById('button-spinner');
 
-        const geminiApiKey = "AIzaSyBQdf-ivr2Qxv6DrFlvc223JxN1rV8DdIs";
+        const geminiApiKey = "AIzaSyDt-CHYI3wwwLpJgfGSr_1P7f9G4xxEtq8";
         const geminiTextApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${geminiApiKey}`;
-        const imagenApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${geminiApiKey}`;
+        const geminiImageApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${geminiApiKey}`;
         const synth = window.speechSynthesis;
         let isSpeaking = false;
 
@@ -214,9 +214,14 @@
                 
                 // 2. 生成圖片
                 const imagePrompt = `A simple, colorful, and friendly illustration of a scene for the English word "${word}". The style should be clean and suitable for a children's book.`;
-                const imagePayload = { instances: [{ prompt: imagePrompt }], parameters: { "sampleCount": 1 } };
+                const imagePayload = {
+                    contents: [{ parts: [{ text: imagePrompt }] }],
+                    generationConfig: {
+                        responseModalities: ['TEXT', 'IMAGE']
+                    },
+                };
                 
-                let imageResponse = await fetchWithExponentialBackoff(imagenApiUrl, {
+                let imageResponse = await fetchWithExponentialBackoff(geminiImageApiUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(imagePayload)
@@ -224,13 +229,18 @@
                 
                 if (!imageResponse.ok) throw new Error(`Image generation failed with status: ${imageResponse.status}`);
                 const imageResult = await imageResponse.json();
-                const imageData = imageResult.predictions[0]?.bytesBase64Encoded;
+                const imageData = imageResult.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
                 if (!imageData) throw new Error("Image data is missing from the response.");
 
                 wordImage.src = `data:image/png;base64,${imageData}`;
                 wordImage.onload = () => {
                     wordImage.classList.remove('hidden');
                     imagePlaceholder.classList.add('hidden');
+                };
+                wordImage.onerror = () => {
+                    wordImage.src = '';
+                    imagePlaceholder.classList.remove('hidden');
+                    imagePlaceholder.textContent = '無法載入圖片';
                 };
 
                 contentDisplay.classList.remove('hidden');
